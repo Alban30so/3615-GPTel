@@ -5,7 +5,6 @@ import serial.tools.list_ports
 
 BAUD_RATE = 1200  # Vitesse standard Minitel mode videotexte
 
-
 def scan_serial_port():
     """Scanne les ports série pour trouver un Minitel connecté"""
     if sys.platform.startswith('darwin'):  # macOS
@@ -51,13 +50,85 @@ class MinitelChatbot:
         self.GREEN_TEXT = b'\x1B\x42'
         self.WHITE_TEXT = b'\x1B\x47'
         self.CYAN_TEXT = b'\x1B\x46'
+        self.BOLD_TEXT = b'\x1B\x45'
 
-    def send(self, data):
-        """Envoie des données au Minitel en s'assurant qu'elles sont au format bytes"""
-        if isinstance(data, str):
-            data = data.encode('ascii', errors='replace')
 
-        self.ser.write(data)
+    def send(self, *args):
+        """Envoie des données (bytes ou str) au Minitel"""
+        for data in args:
+            if isinstance(data, str):
+                data = data.encode('ascii', errors='replace')
+            self.ser.write(data)
+
+    def move_cursor(self, row, col):
+        """Positionne le curseur : Ligne (1-24), Colonne (1-40)"""
+        self.send(b'\x1B\x59' + bytes([row + 31]) + bytes([col + 31]))
+
+    def get_input(self):
+        """Lit les caractères avec gestion de votre touche Envoi (13 41)"""
+        user_input = ""
+        while True:
+            char = self.ser.read(1)
+            if not char:
+                continue
+
+            # Détection des touches de fonction (Préfixe 0x13 sur votre modèle)
+            if char == b'\x13':
+                next_char = self.ser.read(1)
+                if next_char == b'A':  # ENVOI
+                    self.send("\n\r")
+                    return user_input
+                elif next_char == b'G':  # CORRECTION
+                    if len(user_input) > 0:
+                        user_input = user_input[:-1]
+                        self.send(b'\x08 \x08')
+                continue
+
+            # Caractères normaux
+            try:
+                if ord(char) >= 32:
+                    decoded = char.decode('ascii')
+                    user_input += decoded
+            except:
+                pass
+
+    def connexion_simulation(self):
+        self.send(self.CLEAR_SCREEN)
+        input=self.get_input()
+        if input == "3615 LECHAT":
+            self.send("\r\nConnexion au 3615 LeChat...\r\n")
+            time.sleep(1)
+            self.send("\r\nConnexion etablie !\r\n")
+            time.sleep(0.5)
+        else:
+            self.send("\r\nNumero inconnu. Veuillez reessayer.\r\n")
+            time.sleep(1)
+            self.connexion_simulation()
+
+    def show_welcome_page(self):
+        self.send(self.CLEAR_SCREEN)
+        time.sleep(0.2)
+
+        # En-tête
+        self.send(self.CYAN_TEXT)
+        self.send("--- BIENVENUE SUR 3615 LECHAT ---\n\r")
+
+        # Consigne
+        self.send(self.WHITE_TEXT)
+        self.send("Veuillez entrer votre nom pour commencer :\n\r")
+
+        # Ligne de séparation
+        self.send("-" * 40 + "\n\r")
+
+        # Invite de saisie
+        self.send(self.GREEN_TEXT)
+        self.send("NOM : ")
+
+        # Récupération de la saisie
+        nom = self.get_input()
+
+        # Si l'utilisateur n'a rien tapé, on renvoie "Anonyme"
+        return nom if nom.strip() != "" else "Anonyme"
 
     def setup_ui(self):
         """Initialise l'interface visuelle"""
@@ -82,7 +153,7 @@ class MinitelChatbot:
                 continue
 
             # DEBUG réception sérial
-            # print(f"DEBUG: Reçu {char.hex()} ({char})")
+            print(f"DEBUG: Reçu {char.hex()} ({char})")
 
             # Détection du préfixe de la touche envoi du minitel 1B (0x13)
             if char == b'\x13':
@@ -93,8 +164,7 @@ class MinitelChatbot:
                 continue
 
             # Gestion de la touche "Correction" (souvent 0x08 ou 0x7F)
-            #TO DO
-            if char == b'\x08' or char == b'\x7f':
+            if char == b'\x13' :
                 if len(user_input) > 0:
                     user_input = user_input[:-1]
                     self.send(b'\x08 \x08')
@@ -111,13 +181,19 @@ class MinitelChatbot:
                 pass
     def run(self):
         try:
+            #Affichage page simulation connextion
+            self.connexion_simulation()
+            #Affichage page login
+            USERNAME = self.show_welcome_page()
+            #Initialisation interface chat
             self.setup_ui()
             while True:
                 self.send(self.GREEN_TEXT)
-                self.send("MINITEL > ")
+                self.send(f"{USERNAME} > ")
                 question = self.get_input()
 
                 if question.strip().lower() == "exit":
+                    self.send("\n\rAu revoir !")
                     break
 
                 # Gestion des réponses
@@ -128,15 +204,20 @@ class MinitelChatbot:
 
 
                 self.send(self.WHITE_TEXT )
-                self.send("\n\rIA> : ")
+                self.send("\n\rMinitel> : ")
                 self.send(response)
                 self.send("\n\r\n\r")
 
         except KeyboardInterrupt:
+            self.send("\n\rAu revoir !")
+            time.sleep(0.5)
+            self.send(self.CLEAR_SCREEN)
+            self.send(self.CURSOR_HOME)
+            self.send(self.WHITE_TEXT)
+            self.send("\n\rCerveau non disponible, je suis juste un minitel...\n\r")
             print("Déconnexion...")
         finally:
             self.ser.close()
-
 
 if __name__ == "__main__":
     SERIAL_PORT = scan_serial_port()
