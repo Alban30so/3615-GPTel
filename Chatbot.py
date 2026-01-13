@@ -1,9 +1,17 @@
+import json
+
 import serial
 import time
 import sys
 import serial.tools.list_ports
+import requests
 
 BAUD_RATE = 1200  # Vitesse standard Minitel mode videotexte
+
+
+class MinitelResetException(Exception):
+    """Exception pour forcer le redémarrage du script"""
+    pass
 
 def scan_serial_port():
     """Scanne les ports série pour trouver un Minitel connecté"""
@@ -94,6 +102,7 @@ class MinitelChatbot:
 
     def connexion_simulation(self):
         self.send(self.CLEAR_SCREEN)
+        self.send("Entrez votre requete minitel\n\r")
         input=self.get_input()
         if input == "3615 LECHAT":
             self.send("\r\nConnexion au 3615 LeChat...\r\n")
@@ -104,6 +113,9 @@ class MinitelChatbot:
             self.send("\r\nNumero inconnu. Veuillez reessayer.\r\n")
             time.sleep(1)
             self.connexion_simulation()
+
+        USERNAME = self.show_welcome_page()
+        return USERNAME
 
     def show_welcome_page(self):
         self.send(self.CLEAR_SCREEN)
@@ -145,46 +157,95 @@ class MinitelChatbot:
         self.send("-" * 40 + "\n\r")
 
     def get_input(self):
-        """Lit les caractères et gère les séquences spécifiques de votre Minitel"""
+        """Lit les caractères et gère les séquences spécifiques"""
         user_input = ""
         while True:
             char = self.ser.read(1)
             if not char:
                 continue
 
-            # DEBUG réception sérial
-            print(f"DEBUG: Reçu {char.hex()} ({char})")
+            # 1. Détection de déconnexion / extinction (Caractère NULL)
+            if char == b'\x00':
+                print("Signal de déconnexion détecté (0x00)...")
+                # On vide le buffer pour éviter les faux positifs
+                self.ser.reset_input_buffer()
+                raise MinitelResetException("Minitel éteint ou déconnecté")
 
-            # Détection du préfixe de la touche envoi du minitel 1B (0x13)
+            # 2. Détection du préfixe de touche de fonction (0x13)
             if char == b'\x13':
                 next_char = self.ser.read(1)
+
+                # Touche ENVOI (13 41)
                 if next_char == b'A':
                     self.send("\n\r")
                     return user_input
+
+                # Touche CORRECTION (13 47) - Vérifiez si c'est 'G' sur votre Minitel
+                elif next_char == b'G' or next_char == b'\x47':
+                    if len(user_input) > 0:
+                        user_input = user_input[:-1]
+                        self.send(b'\x08 \x08')
                 continue
 
-            # Gestion de la touche "Correction" (souvent 0x08 ou 0x7F)
-            if char == b'\x13' :
-                if len(user_input) > 0:
-                    user_input = user_input[:-1]
-                    self.send(b'\x08 \x08')
-                continue
-
-            # Echo local et stockage du texte
+            # 3. Echo local et stockage du texte
             try:
-                # On n'accepte que les caractères imprimables (espace et au-delà)
                 if ord(char) >= 32:
                     decoded = char.decode('ascii')
-                    #self.send(char)  #Echo local géré par le minitel
+                    # self.send(char) # Décommentez si l'écho local est désactivé sur le Minitel
                     user_input += decoded
-            except UnicodeDecodeError:
+            except (UnicodeDecodeError, ValueError):
                 pass
+    def ask_ollama(self, prompt):
+        """Envoie la requête à Ollama et affiche la réponse en streaming"""
+        url = "http://localhost:11434/api/generate"
+        payload = {
+            "model": "mistral",
+            "prompt": prompt
+        }
+
+        self.send(self.WHITE_TEXT)
+        self.send("\n\rMINITEL > ")
+
+        try:
+            # On utilise stream=True pour recevoir la réponse petit à petit
+            with requests.post(url, json=payload, stream=True, timeout=10) as response:
+                response.raise_for_status()
+
+                for line in response.iter_lines():
+                    if line:
+                        # Décodage du JSON reçu
+                        chunk = json.loads(line.decode('utf-8'))
+                        content = chunk.get("response", "")
+
+                        # On affiche le morceau de texte sur le Minitel
+                        if content:
+                            self.send(content)
+
+                        # Si Ollama a fini
+                        if chunk.get("done", False):
+                            break
+
+        except requests.exceptions.RequestException as e:
+            self.send("\n\rErreur : Impossible de joindre Ollama.\n\r")
+            print(f"Erreur API : {e}")
+
+    def wait_for_minitel(self):
+        """Boucle d'attente jusqu'à ce que le Minitel envoie un signal d'allumage"""
+        print("En attente de l'allumage du Minitel...")
+        self.ser.reset_input_buffer()
+        while True:
+            # On cherche le signal d'allumage typique (0x00 ou n'importe quel signal)
+            char = self.ser.read(1)
+            if char:
+                print(f"Signal reçu ({char.hex()}), Minitel prêt !")
+                time.sleep(3)  # Laisse le temps au Minitel d'être stable
+                return True
     def run(self):
         try:
+            self.wait_for_minitel()
+            time.sleep(3)
             #Affichage page simulation connextion
-            self.connexion_simulation()
-            #Affichage page login
-            USERNAME = self.show_welcome_page()
+            USERNAME = self.connexion_simulation()
             #Initialisation interface chat
             self.setup_ui()
             while True:
@@ -194,18 +255,28 @@ class MinitelChatbot:
 
                 if question.strip().lower() == "exit":
                     self.send("\n\rAu revoir !")
+                    time.sleep(0.5)
+                    self.send(self.CLEAR_SCREEN)
+                    self.send(self.CURSOR_HOME)
+                    self.send(self.WHITE_TEXT)
+                    self.send("\n\rCerveau non disponible, je suis juste un minitel...\n\r")
+                    print("Déconnexion...")
                     break
+
+                if question.strip().lower() == "clear":
+                    self.setup_ui()
+                    continue
 
                 # Gestion des réponses
                 if(question=="SITUATION"):
                     response=f"Mais, vous savez, moi je ne crois pas qu’il y ait de bonne ou de mauvaise situation. Moi, si je devais résumer ma vie aujourd’hui avec vous, je dirais que c’est d’abord des rencontres, des gens qui m’ont tendu la main, peut-être à un moment où je ne pouvais pas, où j’étais seul chez moi. Et c’est assez curieux de se dire que les hasards, les rencontres forgent une destinée… Parce que quand on a le goût de la chose, quand on a le goût de la chose bien faite, le beau geste, parfois on ne trouve pas l’interlocuteur en face, je dirais, le miroir qui vous aide à avancer. Alors ce n’est pas mon cas, comme je le disais là, puisque moi au contraire, j’ai pu ; et je dis merci à la vie, je lui dis merci, je chante la vie, je danse la vie… Je ne suis qu’amour ! Et finalement, quand beaucoup de gens aujourd’hui me disent : STOP pitié"
+                    self.send(self.WHITE_TEXT)
+                    self.send("\n\rMINITEL > ")
+                    self.send(response)
                 else:
-                    response = f"Vous avez dit : {question}. Pour le moment je suis toujours un minitel qui ne sait pas répondre aux questions."
+                    # Appel à Ollama en mode streaming
+                    self.ask_ollama(question)
 
-
-                self.send(self.WHITE_TEXT )
-                self.send("\n\rMinitel> : ")
-                self.send(response)
                 self.send("\n\r\n\r")
 
         except KeyboardInterrupt:
@@ -216,6 +287,13 @@ class MinitelChatbot:
             self.send(self.WHITE_TEXT)
             self.send("\n\rCerveau non disponible, je suis juste un minitel...\n\r")
             print("Déconnexion...")
+
+        except MinitelResetException:#gestion de l'extinction ou deconnexion
+            print("Redémarrage du processus à zéro...")
+            time.sleep(0.5)
+            # On boucle et on revient à wait_for_minitel()
+            self.run()
+
         finally:
             self.ser.close()
 
