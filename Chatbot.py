@@ -60,6 +60,11 @@ class MinitelChatbot:
         self.CYAN_TEXT = b'\x1B\x46'
         self.BOLD_TEXT = b'\x1B\x45'
 
+        #gestion de l'affichage par ligne
+        self.current_line = 0  # Compteur de lignes
+        self.MAX_LINES = 22  # Limite avant pagination
+        self.current_col = 0  # Compteur de colonnes
+
 
     def send(self, *args):
         """Envoie des données (bytes ou str) au Minitel"""
@@ -67,6 +72,50 @@ class MinitelChatbot:
             if isinstance(data, str):
                 data = data.encode('ascii', errors='replace')
             self.ser.write(data)
+
+    def send_with_count(self, data, username):
+        """Envoie des données en gérant physiquement la place sur l'écran"""
+        if isinstance(data, str):
+            for char in data:
+                # Si c'est un retour à la ligne explicite
+                if char == '\n':
+                    self.send("\n\r")
+                    self.current_line += 1
+                    self.current_col = 0
+                else:
+                    self.send(char)
+                    self.current_col += 1
+
+                    # Si on atteint le bord droit de l'écran (40 colonnes)
+                    if self.current_col >= 40:
+                        self.current_line += 1
+                        self.current_col = 0
+
+                # Vérification de la limite de l'écran
+                if self.current_line >= self.MAX_LINES:
+                    print(f"DEBUG: Ligne {self.current_line} atteinte. Attente de SUITE...")
+                    self.wait_for_suite(username)
+
+    def wait_for_suite(self, username):
+        """Affiche le message en bas de l'écran et attend la touche SUITE"""
+        # On force le curseur en bas de l'écran (Ligne 24) pour le message
+        self.move_cursor(24, 1)
+        self.send(self.CYAN_TEXT)
+        self.send(" -- APPUYEZ SUR [SUITE] POUR LIRE -- ")
+
+        # Boucle d'attente pour la touche SUITE (13 48)
+        while True:
+            char = self.ser.read(1)
+            if char == b'\x13':
+                next_char = self.ser.read(1)
+                if next_char == b'H':  # Touche SUITE
+                    break
+            if char == b'\x00':
+                raise MinitelResetException("Minitel déconnecté")
+        # Une fois SUITE pressé, on efface et on réaffiche l'en-tête
+        self.setup_ui()
+        self.send(self.WHITE_TEXT)
+        self.send(f"Minitel > ")
 
     def move_cursor(self, row, col):
         """Positionne le curseur : Ligne (1-24), Colonne (1-40)"""
@@ -155,6 +204,8 @@ class MinitelChatbot:
         self.send(self.WHITE_TEXT)
         self.send("Posez votre question ci-dessous :\n\r")
         self.send("-" * 40 + "\n\r")
+        self.current_line = 4
+        self.current_col=0
 
     def get_input(self):
         """Lit les caractères et gère les séquences spécifiques"""
@@ -164,10 +215,11 @@ class MinitelChatbot:
             if not char:
                 continue
 
+
+
             # 1. Détection de déconnexion / extinction (Caractère NULL)
             if char == b'\x00':
                 print("Signal de déconnexion détecté (0x00)...")
-                # On vide le buffer pour éviter les faux positifs
                 self.ser.reset_input_buffer()
                 raise MinitelResetException("Minitel éteint ou déconnecté")
 
@@ -180,7 +232,9 @@ class MinitelChatbot:
                     self.send("\n\r")
                     return user_input
 
-                # Touche CORRECTION (13 47) - Vérifiez si c'est 'G' sur votre Minitel
+                elif next_char == b'F':  # Touche SOMMAIRE
+                    return "__@&sommaire__"
+
                 elif next_char == b'G' or next_char == b'\x47':
                     if len(user_input) > 0:
                         user_input = user_input[:-1]
@@ -195,7 +249,7 @@ class MinitelChatbot:
                     user_input += decoded
             except (UnicodeDecodeError, ValueError):
                 pass
-    def ask_ollama(self, prompt):
+    def ask_ollama(self, prompt,username):
         """Envoie la requête à Ollama et affiche la réponse en streaming"""
         url = "http://localhost:11434/api/generate"
         payload = {
@@ -205,6 +259,8 @@ class MinitelChatbot:
 
         self.send(self.WHITE_TEXT)
         self.send("\n\rMINITEL > ")
+        self.current_line += 1
+        self.current_col = 11  # Correspond à la longueur de "\n\rMINITEL > "
 
         try:
             # On utilise stream=True pour recevoir la réponse petit à petit
@@ -219,14 +275,14 @@ class MinitelChatbot:
 
                         # On affiche le morceau de texte sur le Minitel
                         if content:
-                            self.send(content)
+                            self.send_with_count(content, username)
 
                         # Si Ollama a fini
                         if chunk.get("done", False):
                             break
 
         except requests.exceptions.RequestException as e:
-            self.send("\n\rErreur : Impossible de joindre Ollama.\n\r")
+            self.send("\n\rErreur : Impossible de joindre le LLM.\n\r")
             print(f"Erreur API : {e}")
 
     def wait_for_minitel(self):
@@ -240,6 +296,7 @@ class MinitelChatbot:
                 print(f"Signal reçu ({char.hex()}), Minitel prêt !")
                 time.sleep(3)  # Laisse le temps au Minitel d'être stable
                 return True
+
     def run(self):
         try:
             self.wait_for_minitel()
@@ -263,7 +320,7 @@ class MinitelChatbot:
                     print("Déconnexion...")
                     break
 
-                if question.strip().lower() == "clear":
+                if question.strip().lower() == "__@&sommaire__":
                     self.setup_ui()
                     continue
 
@@ -275,7 +332,7 @@ class MinitelChatbot:
                     self.send(response)
                 else:
                     # Appel à Ollama en mode streaming
-                    self.ask_ollama(question)
+                    self.ask_ollama(question,USERNAME)
 
                 self.send("\n\r\n\r")
 
