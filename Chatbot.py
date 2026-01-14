@@ -7,7 +7,6 @@ import serial.tools.list_ports
 import requests
 
 BAUD_RATE = 1200  # Vitesse standard Minitel mode videotexte
-MODEL_LLM = "ministral-3:3b"
 
 class MinitelResetException(Exception):
     """Exception pour forcer le redémarrage du script"""
@@ -56,7 +55,6 @@ class MinitelChatbot:
             stopbits=serial.STOPBITS_ONE,
             timeout=0.1
         )
-
         # Codes de contrôle Videotex (norme CEPT2)
         self.CLEAR_SCREEN = b'\x0C'
         self.CURSOR_HOME = b'\x1E'
@@ -70,6 +68,8 @@ class MinitelChatbot:
         self.MAX_LINES = 22  # Limite avant pagination
         self.current_col = 0  # Compteur de colonnes
 
+        #LLM
+        self.MODEL_LLM=""
 
     def send(self, *args):
         """Envoie des données (bytes ou str) au Minitel"""
@@ -133,13 +133,13 @@ class MinitelChatbot:
         input=self.get_input()
         if input == "3615 LECHAT":
             self.send("\r\nConnexion au 3615 LeChat...\r\n")
-            MODEL_LLM="ministral-3:3b"
+            self.MODEL_LLM="ministral-3:3b"
             time.sleep(1)
             self.send("\r\nConnexion etablie !\r\n")
             time.sleep(0.5)
         if input == "3615 MAC":
             self.send("\r\nConnexion au 3615 LeChat (macbook version)...\r\n")
-            MODEL_LLM = "mistral"
+            self.MODEL_LLM = "mistral"
             time.sleep(1)
             self.send("\r\nConnexion etablie !\r\n")
             time.sleep(0.5)
@@ -226,13 +226,15 @@ class MinitelChatbot:
                         self.send(b'\x08 \x08')
                 continue
 
-            # 3. Echo local et stockage du texte
-            try:
+            try:#gestion de la taille des questions pour l'affichage.
                 if ord(char) >= 32:
                     decoded = char.decode('ascii')
-                    # self.send(char) # Décommentez si l'écho local est désactivé sur le Minitel
                     user_input += decoded
-            except (UnicodeDecodeError, ValueError):
+                    self.current_col += 1
+                    if self.current_col >= 40:
+                        self.current_line += 1
+                        self.current_col = 0
+            except:
                 pass
 
     def filter_text(self, text):
@@ -248,14 +250,15 @@ class MinitelChatbot:
         """Envoie la requête à Ollama et affiche la réponse en streaming"""
         url = "http://localhost:11434/api/generate"
         payload = {
-            "model": MODEL_LLM,
+            "model": self.MODEL_LLM,
             "prompt": prompt
         }
 
         self.send(self.WHITE_TEXT)
         self.send("\n\rMINITEL > ")
         self.current_line += 1
-        self.current_col = 11  # Correspond à la longueur de "\n\rMINITEL > "
+        self.current_col = 11  # Correspond à la longueur de "\n\rMINITEL >
+
 
         try:
             # On utilise stream=True pour recevoir la réponse petit à petit
@@ -306,6 +309,7 @@ class MinitelChatbot:
         try:
             self.wait_for_minitel()
             time.sleep(3)
+            self.beep()
             #Affichage page simulation connextion
             USERNAME = self.connexion_simulation()
             #Initialisation interface chat
@@ -323,7 +327,7 @@ class MinitelChatbot:
                     self.send(self.WHITE_TEXT)
                     self.send("\n\rCerveau non disponible, je suis juste un minitel...\n\r")
                     print("Déconnexion...")
-                    break
+                    exit(0)
 
                 #reset de l'interface
                 if question.strip().lower() == "__@&sommaire__":
@@ -331,14 +335,15 @@ class MinitelChatbot:
                     continue
 
                 # Gestion des réponses
-                if(question=="SITUATION"):#easter egg Otis
+                if(question=="C'EST UNE BONNE SITUATION MINITEL ?"):#easter egg Otis
                     response=f"Mais, vous savez, moi je ne crois pas qu’il y ait de bonne ou de mauvaise situation. Moi, si je devais résumer ma vie aujourd’hui avec vous, je dirais que c’est d’abord des rencontres, des gens qui m’ont tendu la main, peut-être à un moment où je ne pouvais pas, où j’étais seul chez moi. Et c’est assez curieux de se dire que les hasards, les rencontres forgent une destinée… Parce que quand on a le goût de la chose, quand on a le goût de la chose bien faite, le beau geste, parfois on ne trouve pas l’interlocuteur en face, je dirais, le miroir qui vous aide à avancer. Alors ce n’est pas mon cas, comme je le disais là, puisque moi au contraire, j’ai pu ; et je dis merci à la vie, je lui dis merci, je chante la vie, je danse la vie… Je ne suis qu’amour ! Et finalement, quand beaucoup de gens aujourd’hui me disent : STOP pitié"
-                    self.send(self.WHITE_TEXT)
-                    self.send("\n\rMINITEL > ")
-                    self.send(response)
+                    self.send_with_count(response, "OTIS")
                 else:
                     # Appel à Ollama en mode streaming
                     self.ask_ollama(question,USERNAME)
+                    # Prévention d'un affichage trop long sans pagination
+                    if self.current_line >= 20:
+                        self.send(self.CYAN_TEXT, "\n\r -- FIN DE REPONSE [SOMMAIRE] POUR EFFACER --")
 
                 self.send("\n\r\n\r")
 
