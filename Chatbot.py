@@ -31,11 +31,16 @@ def scan_serial_port():
         print(f" - {port.device}: {port.description}")
     serial_port = []
 
-    for port in ports_disponibles:
-        # On vérifie si le port commence par l'un des préfixes connus
-        for prefix in prefixes:
-            if port.device.startswith(prefix):
-                serial_port.append(port.device)
+    if(not ports_disponibles):
+        print("Aucun port série détecté. Veuillez vérifier la connexion du Minitel.")
+        sys.exit(1)
+    else :
+        for port in ports_disponibles:
+            # On vérifie si le port commence par l'un des préfixes connus
+            for prefix in prefixes:
+                if port.device.startswith(prefix):
+                    serial_port.append(port.device)
+
 
     print ("Ports série détectés pour Minitel : ", serial_port)
 
@@ -121,33 +126,6 @@ class MinitelChatbot:
         """Positionne le curseur : Ligne (1-24), Colonne (1-40)"""
         self.send(b'\x1B\x59' + bytes([row + 31]) + bytes([col + 31]))
 
-    def get_input(self):
-        """Lit les caractères avec gestion de votre touche Envoi (13 41)"""
-        user_input = ""
-        while True:
-            char = self.ser.read(1)
-            if not char:
-                continue
-
-            # Détection des touches de fonction (Préfixe 0x13 sur votre modèle)
-            if char == b'\x13':
-                next_char = self.ser.read(1)
-                if next_char == b'A':  # ENVOI
-                    self.send("\n\r")
-                    return user_input
-                elif next_char == b'G':  # CORRECTION
-                    if len(user_input) > 0:
-                        user_input = user_input[:-1]
-                        self.send(b'\x08 \x08')
-                continue
-
-            # Caractères normaux
-            try:
-                if ord(char) >= 32:
-                    decoded = char.decode('ascii')
-                    user_input += decoded
-            except:
-                pass
 
     def connexion_simulation(self):
         self.send(self.CLEAR_SCREEN)
@@ -222,8 +200,6 @@ class MinitelChatbot:
             char = self.ser.read(1)
             if not char:
                 continue
-
-
 
             # 1. Détection de déconnexion / extinction (Caractère NULL)
             if char == b'\x00':
