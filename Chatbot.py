@@ -1,5 +1,5 @@
 import json
-
+import unicodedata
 import serial
 import time
 import sys
@@ -7,7 +7,7 @@ import serial.tools.list_ports
 import requests
 
 BAUD_RATE = 1200  # Vitesse standard Minitel mode videotexte
-
+MODEL_LLM = "ministral-3:3b"
 
 class MinitelResetException(Exception):
     """Exception pour forcer le redémarrage du script"""
@@ -20,7 +20,7 @@ def scan_serial_port():
         prefixes = ["/dev/cu.usbserial-", "/dev/cu.usbmodem"]
     elif sys.platform.startswith('linux'):  # Linux
         print("Scan des ports série sur Linux...")
-        prefixes = ["/dev/cuUSB", "/dev/cuACM"]
+        prefixes = ["/dev/ttyUSB", "/dev/ttyACM","dev/ttyTHS"]
     else:
         print("Scan des ports série sur Windows...")
         prefixes = ["COM"] # Windows
@@ -155,9 +155,17 @@ class MinitelChatbot:
         input=self.get_input()
         if input == "3615 LECHAT":
             self.send("\r\nConnexion au 3615 LeChat...\r\n")
+            MODEL_LLM="ministral-3:3b"
             time.sleep(1)
             self.send("\r\nConnexion etablie !\r\n")
             time.sleep(0.5)
+        if input == "3615 MAC":
+            self.send("\r\nConnexion au 3615 LeChat (macbook version)...\r\n")
+            MODEL_LLM = "mistral"
+            time.sleep(1)
+            self.send("\r\nConnexion etablie !\r\n")
+            time.sleep(0.5)
+
         else:
             self.send("\r\nNumero inconnu. Veuillez reessayer.\r\n")
             time.sleep(1)
@@ -249,11 +257,21 @@ class MinitelChatbot:
                     user_input += decoded
             except (UnicodeDecodeError, ValueError):
                 pass
+
+    def filter_text(self, text):
+        """Remplace les accents par leurs équivalents ASCII et filtre les caractères spéciaux"""
+
+        nfkd_form = unicodedata.normalize('NFKD', text)
+
+        only_ascii = nfkd_form.encode('ASCII', 'ignore').decode('ASCII')
+
+        return only_ascii
+
     def ask_ollama(self, prompt,username):
         """Envoie la requête à Ollama et affiche la réponse en streaming"""
         url = "http://localhost:11434/api/generate"
         payload = {
-            "model": "mistral",
+            "model": MODEL_LLM,
             "prompt": prompt
         }
 
@@ -269,13 +287,15 @@ class MinitelChatbot:
 
                 for line in response.iter_lines():
                     if line:
-                        # Décodage du JSON reçu
                         chunk = json.loads(line.decode('utf-8'))
                         content = chunk.get("response", "")
 
-                        # On affiche le morceau de texte sur le Minitel
+
                         if content:
-                            self.send_with_count(content, username)
+                            clean_content = self.filter_text(content)
+
+                            if clean_content:
+                                self.send_with_count(clean_content, username)
 
                         # Si Ollama a fini
                         if chunk.get("done", False):
