@@ -137,7 +137,7 @@ class MinitelChatbot:
             time.sleep(1)
             self.send("\r\nConnexion etablie !\r\n")
             time.sleep(0.5)
-        if input == "3615 MAC":
+        elif input == "3615 MAC":
             self.send("\r\nConnexion au 3615 LeChat (macbook version)...\r\n")
             self.MODEL_LLM = "mistral"
             time.sleep(1)
