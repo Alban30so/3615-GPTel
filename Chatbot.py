@@ -179,6 +179,7 @@ class MinitelChatbot:
 
     def setup_ui(self):
         """Initialise l'interface visuelle"""
+        self.beep()
         self.send(self.CLEAR_SCREEN)
         time.sleep(0.2)
 
@@ -275,10 +276,14 @@ class MinitelChatbot:
 
                         # Si Ollama a fini
                         if chunk.get("done", False):
+                            self.beep()
                             break
 
         except requests.exceptions.RequestException as e:
             self.send("\n\rErreur : Impossible de joindre le LLM.\n\r")
+            self.beep()
+            time.sleep(0.1)
+            self.beep()
             print(f"Erreur API : {e}")
 
     def wait_for_minitel(self):
@@ -292,6 +297,10 @@ class MinitelChatbot:
                 print(f"Signal reçu ({char.hex()}), Minitel prêt !")
                 time.sleep(3)  # Laisse le temps au Minitel d'être stable
                 return True
+
+    def beep(self):
+        """Fait émettre un signal sonore au Minitel"""
+        self.send(b'\x07')
 
     def run(self):
         try:
@@ -316,12 +325,13 @@ class MinitelChatbot:
                     print("Déconnexion...")
                     break
 
+                #reset de l'interface
                 if question.strip().lower() == "__@&sommaire__":
                     self.setup_ui()
                     continue
 
                 # Gestion des réponses
-                if(question=="SITUATION"):
+                if(question=="SITUATION"):#easter egg Otis
                     response=f"Mais, vous savez, moi je ne crois pas qu’il y ait de bonne ou de mauvaise situation. Moi, si je devais résumer ma vie aujourd’hui avec vous, je dirais que c’est d’abord des rencontres, des gens qui m’ont tendu la main, peut-être à un moment où je ne pouvais pas, où j’étais seul chez moi. Et c’est assez curieux de se dire que les hasards, les rencontres forgent une destinée… Parce que quand on a le goût de la chose, quand on a le goût de la chose bien faite, le beau geste, parfois on ne trouve pas l’interlocuteur en face, je dirais, le miroir qui vous aide à avancer. Alors ce n’est pas mon cas, comme je le disais là, puisque moi au contraire, j’ai pu ; et je dis merci à la vie, je lui dis merci, je chante la vie, je danse la vie… Je ne suis qu’amour ! Et finalement, quand beaucoup de gens aujourd’hui me disent : STOP pitié"
                     self.send(self.WHITE_TEXT)
                     self.send("\n\rMINITEL > ")
