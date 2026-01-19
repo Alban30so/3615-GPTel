@@ -44,6 +44,22 @@ def scan_serial_port():
     print ("Ports série détectés pour Minitel : ", serial_port)
 
     return serial_port[0]
+
+def preload_model():
+    """Envoie une requête vide pour forcer Ollama à charger le modèle en VRAM"""
+    url = "http://localhost:11434/api/generate"
+    payload = {
+        "model": "ministral-3:3b",  # Ton modèle
+        "prompt": "",        # Prompt vide juste pour charger
+        "keep_alive": -1     # Optionnel : Garde le modèle en RAM indéfiniment
+    }
+    try:
+        # On ne stream pas, on veut juste que ça revienne une fois chargé
+        requests.post(url, json=payload, timeout=30)
+        print("Modèle chargé et prêt !")
+    except Exception as e:
+        print(f"Erreur lors du préchargement (pas grave, ça se fera après) : {e}")
+
 class MinitelChatbot:
     def __init__(self):
         # Configuration spécifique au Minitel : 7 bits, Parité Paire, 1 bit de stop
@@ -380,5 +396,7 @@ class MinitelChatbot:
 
 if __name__ == "__main__":
     SERIAL_PORT = scan_serial_port()
+    print("Initialisation : Chargement du modèle Ollama en mémoire...")
+    preload_model()
     bot = MinitelChatbot()
     bot.run()
