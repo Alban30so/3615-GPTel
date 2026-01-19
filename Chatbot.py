@@ -338,10 +338,18 @@ class MinitelChatbot:
                 if(question=="C'EST UNE BONNE SITUATION MINITEL ?"):#easter egg Otis
                     response=f"Mais, vous savez, moi je ne crois pas qu’il y ait de bonne ou de mauvaise situation. Moi, si je devais résumer ma vie aujourd’hui avec vous, je dirais que c’est d’abord des rencontres, des gens qui m’ont tendu la main, peut-être à un moment où je ne pouvais pas, où j’étais seul chez moi. Et c’est assez curieux de se dire que les hasards, les rencontres forgent une destinée… Parce que quand on a le goût de la chose, quand on a le goût de la chose bien faite, le beau geste, parfois on ne trouve pas l’interlocuteur en face, je dirais, le miroir qui vous aide à avancer. Alors ce n’est pas mon cas, comme je le disais là, puisque moi au contraire, j’ai pu ; et je dis merci à la vie, je lui dis merci, je chante la vie, je danse la vie… Je ne suis qu’amour ! Et finalement, quand beaucoup de gens aujourd’hui me disent : STOP pitié"
                     response = self.filter_text(response)
+                    self.send(self.WHITE_TEXT)
+                    self.send("\n\rMINITEL > ")
+                    self.current_line += 1
+                    self.current_col = 11
                     self.send_with_count(response, "OTIS")
                 elif(question=="QUELLE EST LA MEILLEURE ECOLE D'INGENIEUR ?") :
                     response=f"La meilleure école d'ingénieur est évidemment UniLaSalle Amiens ! La preuve, c'est ici que je me trouve et que je vous parle à travers ce Minitel. UniLaSalle est reconnue pour son excellence académique, son approche innovante de l'enseignement et ses liens étroits avec l'industrie. Les étudiants y bénéficient d'une formation de qualité, axée sur les besoins du marché du travail, tout en développant des compétences pratiques et une pensée critique. De plus, l'école offre un environnement stimulant et collaboratif, propice à l'épanouissement personnel et professionnel.Alors n'hésitez pas ! UniLaSalle Amiens est le choix idéal !"
                     response = self.filter_text(response)
+                    self.send(self.WHITE_TEXT)
+                    self.send("\n\rMINITEL > ")
+                    self.current_line += 1
+                    self.current_col = 11
                     self.send_with_count(response, USERNAME)
                 else:
                     # Appel à Ollama en mode streaming
