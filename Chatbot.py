@@ -267,7 +267,10 @@ class MinitelChatbot:
         url = "http://localhost:11434/api/generate"
         payload = {
             "model": self.MODEL_LLM,
-            "prompt": prompt
+            "message":[
+                {"role":"system","content":"Tu es un chatbot communiquant avec l'utilisateur via un minitel, de ce fait, tu es libre d'y faire des références et d'adapter ton langage en conséquence. Réponds de manière concise et claire, en respectant les limitations d'affichage du minitel (pas d'utilisation de markdown, d'image, de schéma). Tu as été conçu par des étudiants de l'école d'ingénieur UniLaSalle Amiens. répond aux questions de l'utilisateur"},
+                {"role":"user","content":prompt}
+            ]
         }
 
         self.send(self.WHITE_TEXT)
