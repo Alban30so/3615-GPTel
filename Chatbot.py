@@ -5,12 +5,22 @@ import time
 import sys
 import serial.tools.list_ports
 import requests
+import subprocess
 
 BAUD_RATE = 1200  # Vitesse standard Minitel mode videotexte
 
 class MinitelResetException(Exception):
     """Exception pour forcer le redémarrage du script"""
     pass
+
+def shutdown():
+    try:
+        print("Initiation de l'arrêt du système...")
+        subprocess.run(["sudo", "shutdown", "now"], check=True)
+    except subprocess.CalledProcessError as e:
+        print(f"Erreur lors de la tentative d'arrêt : {e}")
+    except Exception as e:
+        print(f"Une erreur inattendue est survenue : {e}")
 
 def scan_serial_port():
     """Scanne les ports série pour trouver un Minitel connecté"""
@@ -195,7 +205,6 @@ class MinitelChatbot:
 
     def setup_ui(self):
         """Initialise l'interface visuelle"""
-        self.beep()
         self.send(self.CLEAR_SCREEN)
         time.sleep(0.2)
 
@@ -263,7 +272,7 @@ class MinitelChatbot:
         return only_ascii
 
     def ask_ollama(self, prompt,username):
-        """Envoie la requête à Ollama et affiche la réponse en streaming"""
+        """Envoie la requête à Ollama avec le contexte et affiche la réponse sur l'écran du minitel"""
         url = "http://localhost:11434/api/generate"
         payload = {
             "model": self.MODEL_LLM,
@@ -276,7 +285,7 @@ class MinitelChatbot:
         self.send(self.WHITE_TEXT)
         self.send("\n\rMINITEL > ")
         self.current_line += 1
-        self.current_col = 11  # Correspond à la longueur de "\n\rMINITEL >
+        self.current_col = 11  #longueur de "\n\rMINITEL >
 
 
         try:
@@ -304,7 +313,7 @@ class MinitelChatbot:
         except requests.exceptions.RequestException as e:
             self.send("\n\rErreur : Impossible de joindre le LLM.\n\r")
             self.beep()
-            time.sleep(0.1)
+            time.sleep(0.5)
             self.beep()
             print(f"Erreur API : {e}")
 
@@ -338,14 +347,18 @@ class MinitelChatbot:
                 self.send(f"{USERNAME} > ")
                 question = self.get_input()
 
+                #fonction permettant d'éteindre la carte.
                 if question.strip().lower() == "exit":
                     self.send("\n\rAu revoir !")
                     time.sleep(0.5)
                     self.send(self.CLEAR_SCREEN)
                     self.send(self.CURSOR_HOME)
                     self.send(self.WHITE_TEXT)
-                    self.send("\n\rCerveau non disponible, je suis juste un minitel...\n\r")
+                    self.send("\n\rCerveau éteint, je suis juste un minitel...\n\r")
+                    self.send("\n\r#AVC\n\r")
+                    self.beep()
                     print("Déconnexion...")
+                    shutdown()#extinciton de la jetson nano.
                     exit(0)
 
                 #reset de l'interface
