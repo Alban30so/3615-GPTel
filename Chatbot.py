@@ -286,7 +286,7 @@ class MinitelChatbot:
                     "content": prompt
                 }
             ],
-            "stream": True  # Explicite pour la lisibilité
+            "stream": True
         }
 
         self.send(self.WHITE_TEXT)
