@@ -273,13 +273,13 @@ class MinitelChatbot:
 
     def ask_ollama(self, prompt,username):
         """Envoie la requête à Ollama avec le contexte et affiche la réponse sur l'écran du minitel"""
-        url = "http://localhost:11434/api/generate"
+        url = "http://localhost:11434/api/chat"
         payload = {
             "model": self.MODEL_LLM,
             "messages": [
                 {
                     "role": "system",
-                    "content": "Tu es un chatbot communiquant avec l'utilisateur via un minitel, de ce fait, tu es libre d'y faire des références et d'adapter ton langage en conséquence. Réponds de manière concise et claire, en respectant les limitations d'affichage du minitel (pas d'utilisation de markdown, d'image, de schéma). Tu as été conçu par des étudiants de l'école d'ingénieur UniLaSalle Amiens. répond aux questions de l'utilisateur"
+                    "content": "Tu es un chatbot communiquant avec l'utilisateur via un minitel, de ce fait, tu es libre d'y faire des références et d'adapter ton langage en conséquence. Réponds de manière concise et claire, en respectant les limitations d'affichage du minitel (pas d'utilisation de markdown, d'image, de schéma ou de symboles spéciaux). Tu as été conçu par des étudiants de l'école d'ingénieur UniLaSalle Amiens dans le cadre d'un projet d'étudiant 5ème année (Alban et Mathis). répond aux questions de l'utilisateur"
                 },
                 {
                     "role": "user",
@@ -303,16 +303,15 @@ class MinitelChatbot:
                 for line in response.iter_lines():
                     if line:
                         chunk = json.loads(line.decode('utf-8'))
-                        content = chunk.get("response", "")
-
+                        message_obj = chunk.get("message", {})
+                        content = message_obj.get("content", "")
 
                         if content:
+                            print(content, end="", flush=True) # Debug console
                             clean_content = self.filter_text(content)
-
                             if clean_content:
                                 self.send_with_count(clean_content, username)
 
-                        # Si Ollama a fini
                         if chunk.get("done", False):
                             self.beep()
                             break
@@ -392,6 +391,7 @@ class MinitelChatbot:
                     self.send_with_count(response, USERNAME)
                 else:
                     # Appel à Ollama en mode streaming
+                    print("ask ollama")
                     self.ask_ollama(question,USERNAME)
                     # Prévention d'un affichage trop long sans pagination
                     if self.current_line >= 20:
