@@ -276,10 +276,17 @@ class MinitelChatbot:
         url = "http://localhost:11434/api/generate"
         payload = {
             "model": self.MODEL_LLM,
-            "message":[
-                {"role":"system","content":"Tu es un chatbot communiquant avec l'utilisateur via un minitel, de ce fait, tu es libre d'y faire des références et d'adapter ton langage en conséquence. Réponds de manière concise et claire, en respectant les limitations d'affichage du minitel (pas d'utilisation de markdown, d'image, de schéma). Tu as été conçu par des étudiants de l'école d'ingénieur UniLaSalle Amiens. répond aux questions de l'utilisateur"},
-                {"role":"user","content":prompt}
-            ]
+            "messages": [
+                {
+                    "role": "system",
+                    "content": "Tu es un chatbot communiquant avec l'utilisateur via un minitel, de ce fait, tu es libre d'y faire des références et d'adapter ton langage en conséquence. Réponds de manière concise et claire, en respectant les limitations d'affichage du minitel (pas d'utilisation de markdown, d'image, de schéma). Tu as été conçu par des étudiants de l'école d'ingénieur UniLaSalle Amiens. répond aux questions de l'utilisateur"
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+            "stream": True  # Explicite pour la lisibilité
         }
 
         self.send(self.WHITE_TEXT)
@@ -354,7 +361,7 @@ class MinitelChatbot:
                     self.send(self.CLEAR_SCREEN)
                     self.send(self.CURSOR_HOME)
                     self.send(self.WHITE_TEXT)
-                    self.send("\n\rCerveau éteint, je suis juste un minitel...\n\r")
+                    self.send("\n\rCerveau eteint, je suis juste un minitel...\n\r")
                     self.send("\n\r#AVC\n\r")
                     self.beep()
                     print("Déconnexion...")
