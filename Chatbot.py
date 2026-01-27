@@ -170,6 +170,9 @@ class MinitelChatbot:
             self.send("\r\nConnexion etablie !\r\n")
             time.sleep(0.5)
 
+        elif input == "exit":
+            self.shutdown_system()
+
         else:
             self.send("\r\nNumero inconnu. Veuillez reessayer.\r\n")
             time.sleep(1)
@@ -199,6 +202,9 @@ class MinitelChatbot:
 
         # Récupération de la saisie
         nom = self.get_input()
+
+        if nom.strip().lower() == "exit":
+            self.shutdown_system()
 
         # Si l'utilisateur n'a rien tapé, on renvoie "Anonyme"
         return nom if nom.strip() != "" else "Anonyme"
@@ -241,6 +247,10 @@ class MinitelChatbot:
                 if next_char == b'A':
                     self.send("\n\r")
                     return user_input
+
+                #touche Repetition
+                elif next_char == b'E':  # Touche REPETITION
+                    raise MinitelResetException("Redémarrage demandé via REPETITION")
 
                 elif next_char == b'F':  # Touche SOMMAIRE
                     return "__@&sommaire__"
@@ -339,6 +349,19 @@ class MinitelChatbot:
         """Fait émettre un signal sonore au Minitel"""
         self.send(b'\x07')
 
+    def shutdown_system(self):
+        """Éteint le système proprement"""
+        self.send("\n\rAu revoir !")
+        time.sleep(0.5)
+        self.send(self.CLEAR_SCREEN)
+        self.send(self.CURSOR_HOME)
+        self.send(self.WHITE_TEXT)
+        self.send("\n\rCerveau eteint, je suis juste un minitel...\n\r")
+        self.send("\n\r#AVC\n\r")
+        self.beep()
+        print("Déconnexion...")
+        shutdown()
+
     def run(self):
         try:
             self.wait_for_minitel()
@@ -355,17 +378,7 @@ class MinitelChatbot:
 
                 #fonction permettant d'éteindre la carte.
                 if question.strip().lower() == "exit":
-                    self.send("\n\rAu revoir !")
-                    time.sleep(0.5)
-                    self.send(self.CLEAR_SCREEN)
-                    self.send(self.CURSOR_HOME)
-                    self.send(self.WHITE_TEXT)
-                    self.send("\n\rCerveau eteint, je suis juste un minitel...\n\r")
-                    self.send("\n\r#AVC\n\r")
-                    self.beep()
-                    print("Déconnexion...")
-                    shutdown()#extinciton de la jetson nano.
-                    exit(0)
+                    self.shutdown_system()
 
                 #reset de l'interface
                 if question.strip().lower() == "__@&sommaire__":
@@ -399,7 +412,7 @@ class MinitelChatbot:
 
                 self.send("\n\r\n\r")
 
-        except KeyboardInterrupt:
+        except KeyboardInterrupt :
             self.send("\n\rAu revoir !")
             time.sleep(0.5)
             self.send(self.CLEAR_SCREEN)
