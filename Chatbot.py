@@ -152,34 +152,43 @@ class MinitelChatbot:
         """Positionne le curseur : Ligne (1-24), Colonne (1-40)"""
         self.send(b'\x1B\x59' + bytes([row + 31]) + bytes([col + 31]))
 
-
     def connexion_simulation(self):
-        self.send(self.CLEAR_SCREEN)
-        self.send("Entrez votre requete minitel\n\r")
-        input=self.get_input()
-        if input == "3615 LECHAT":
-            self.send("\r\nConnexion au 3615 LeChat...\r\n")
-            self.MODEL_LLM="ministral-3:3b"
-            time.sleep(1)
-            self.send("\r\nConnexion etablie !\r\n")
-            time.sleep(0.5)
-        elif input == "3615 MAC":
-            self.send("\r\nConnexion au 3615 LeChat (macbook version)...\r\n")
-            self.MODEL_LLM = "mistral"
-            time.sleep(1)
-            self.send("\r\nConnexion etablie !\r\n")
-            time.sleep(0.5)
+        """Gestion de la connexion sans récursivité"""
+        while True:
+            self.send(self.CLEAR_SCREEN)
+            self.send("Entrez votre requete minitel\n\r")
 
-        elif input == "exit":
-            self.shutdown_system()
+            # On récupère l'entrée
+            user_input = self.get_input()
+            cmd = user_input.strip().upper()
 
-        else:
-            self.send("\r\nNumero inconnu. Veuillez reessayer.\r\n")
-            time.sleep(1)
-            self.connexion_simulation()
+            if cmd == "3615 LECHAT":
+                self.send("\r\nConnexion au 3615 LeChat...\r\n")
+                self.MODEL_LLM = "ministral-3:3b"
+                time.sleep(1)
+                self.send("\r\nConnexion etablie !\r\n")
+                time.sleep(0.5)
+                break  # Sortie de boucle
 
-        USERNAME = self.show_welcome_page()
-        return USERNAME
+            elif cmd == "3615 MAC":
+                self.send("\r\nConnexion au 3615 LeChat (Mac)...\r\n")
+                self.MODEL_LLM = "mistral"
+                time.sleep(1)
+                self.send("\r\nConnexion etablie !\r\n")
+                time.sleep(0.5)
+                break  # Sortie de boucle
+
+            elif cmd == "exit":
+                self.shutdown_system()
+
+            else:
+                self.send(f"\r\nService '{cmd}' inconnu.\r\n")
+                self.send("Veuillez reessayer.\r\n")
+                time.sleep(1.5)
+                # On recommence la boucle while
+
+        # On appelle la page de bienvenue une seule fois, après la réussite
+        return self.show_welcome_page()
 
     def show_welcome_page(self):
         self.send(self.CLEAR_SCREEN)
@@ -289,7 +298,7 @@ class MinitelChatbot:
             "messages": [
                 {
                     "role": "system",
-                    "content": "Tu es un chatbot communiquant avec l'utilisateur via un minitel, de ce fait, tu es libre d'y faire des références et d'adapter ton langage en conséquence. Réponds de manière concise et claire, en respectant les limitations d'affichage du minitel (pas d'utilisation de markdown, d'image, de schéma ou de symboles spéciaux). Tu as été conçu par des étudiants de l'école d'ingénieur UniLaSalle Amiens dans le cadre d'un projet d'étudiant 5ème année (Alban et Mathis). répond aux questions de l'utilisateur"
+                    "content": "Tu es un chatbot communiquant avec l'utilisateur via un minitel, de ce fait, tu es libre d'y faire des références et d'adapter ton langage en conséquence. Réponds de manière concise et claire, en respectant les limitations d'affichage du minitel (pas d'utilisation de markdown, d'image, de schéma ou de symboles spéciaux et pas de texte en gras). Tu as été conçu par des étudiants de l'école d'ingénieur UniLaSalle Amiens dans le cadre d'un projet d'étudiant 5ème année (Alban et Mathis). Répond aux questions de l'utilisateur. Le nom de l'utilisateur est "+username+", tu es libre de l'appeler par ce prénom."
                 },
                 {
                     "role": "user",
@@ -342,6 +351,7 @@ class MinitelChatbot:
             char = self.ser.read(1)
             if char:
                 print(f"Signal reçu ({char.hex()}), Minitel prêt !")
+                self.ser.reset_input_buffer()
                 time.sleep(3)  # Laisse le temps au Minitel d'être stable
                 return True
 
