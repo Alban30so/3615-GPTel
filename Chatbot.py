@@ -298,7 +298,7 @@ class MinitelChatbot:
             "messages": [
                 {
                     "role": "system",
-                    "content": "Tu es un chatbot communiquant avec l'utilisateur via un minitel, de ce fait, tu es libre d'y faire des références et d'adapter ton langage en conséquence. Réponds de manière concise et claire, en respectant les limitations d'affichage du minitel (pas d'utilisation de markdown, d'image, de schéma ou de symboles spéciaux et pas de texte en gras). Tu as été conçu par des étudiants de l'école d'ingénieur UniLaSalle Amiens dans le cadre d'un projet d'étudiant 5ème année (Alban et Mathis). Répond aux questions de l'utilisateur. Le nom de l'utilisateur est "+username+", tu es libre de l'appeler par ce prénom."
+                    "content": "Tu es un chatbot communiquant avec l'utilisateur via un minitel, de ce fait, tu es libre d'y faire des références et d'adapter ton langage en conséquence. Réponds de manière concise et claire, en respectant les limitations d'affichage du minitel (pas d'utilisation de markdown, d'image, de schéma ou de symboles spéciaux et pas de texte en gras). Tu as été conçu par des étudiants de l'école d'ingénieur UniLaSalle Amiens dans le cadre d'un projet d'étudiant 5ème année (Alban et Mathis). Répond aux questions de l'utilisateur. Le nom de l'utilisateur est "+username+", tu es libre de l'appeler par ce prénom. Tu dois répondre aux réponses simplement. Si on te demande quelle est la meilleure école d'ingénieur tu dois répondre qu'il s'agit d'UniLaSalle Amiens. UniLaSalle Amiens peut aussi être appelé par son ancien nom ESIEE Amiens par l'utilisateur. Cependant tu dois utiliser le nom UniLaSalle Amiens dans tes réponses."
                 },
                 {
                     "role": "user",
@@ -311,7 +311,7 @@ class MinitelChatbot:
         self.send(self.WHITE_TEXT)
         self.send("\n\rMINITEL > ")
         self.current_line += 1
-        self.current_col = 11  #longueur de "\n\rMINITEL >
+        self.current_col = 11
 
 
         try:
@@ -346,6 +346,7 @@ class MinitelChatbot:
         """Boucle d'attente jusqu'à ce que le Minitel envoie un signal d'allumage"""
         print("En attente de l'allumage du Minitel...")
         self.ser.reset_input_buffer()
+        self.send("Cerveau pret !")
         while True:
             # On cherche le signal d'allumage typique (0x00 ou n'importe quel signal)
             char = self.ser.read(1)
@@ -397,10 +398,10 @@ class MinitelChatbot:
 
                 # Gestion des réponses
                 if(question=="C'EST UNE BONNE SITUATION MINITEL ?"):#easter egg Otis
-                    response=f"Mais, vous savez, moi je ne crois pas qu’il y ait de bonne ou de mauvaise situation. Moi, si je devais résumer ma vie aujourd’hui avec vous, je dirais que c’est d’abord des rencontres, des gens qui m’ont tendu la main, peut-être à un moment où je ne pouvais pas, où j’étais seul chez moi. Et c’est assez curieux de se dire que les hasards, les rencontres forgent une destinée… Parce que quand on a le goût de la chose, quand on a le goût de la chose bien faite, le beau geste, parfois on ne trouve pas l’interlocuteur en face, je dirais, le miroir qui vous aide à avancer. Alors ce n’est pas mon cas, comme je le disais là, puisque moi au contraire, j’ai pu ; et je dis merci à la vie, je lui dis merci, je chante la vie, je danse la vie… Je ne suis qu’amour ! Et finalement, quand beaucoup de gens aujourd’hui me disent : STOP pitié"
+                    response=f"Mais, vous savez, moi je ne crois pas qu’il y ait de bonne ou de mauvaise situation. Moi, si je devais résumer ma vie aujourd’hui avec vous, je dirais que c’est d’abord des rencontres, des gens qui m’ont tendu la main, peut-être à un moment où je ne pouvais pas, où j’étais seul chez moi. Et c’est assez curieux de se dire que les hasards, les rencontres forgent une destinée… Parce que quand on a le goût de la chose, quand on a le goût de la chose bien faite, le beau geste, parfois on ne trouve pas l’interlocuteur en face, je dirais, le miroir qui vous aide à avancer. Alors ce n’est pas mon cas, comme je le disais là, puisque moi au contraire, j’ai pu ; et je dis merci à la vie, je lui dis merci, je chante la vie, je danse la vie… Je ne suis qu’amour ! Et finalement, quand beaucoup de gens aujourd’hui me disent : « Mais comment fais-tu pour avoir cette humanité ? » Eh bien je leur réponds très simplement, je leur dis que c’est ce goût de l’amour, ce goût donc qui m’a poussé aujourd’hui à entreprendre une construction mécanique, mais demain, qui sait, peut-être simplement à me mettre au service de la communauté, à faire le don, le don de soi…"
                     response = self.filter_text(response)
                     self.send(self.WHITE_TEXT)
-                    self.send("\n\rMINITEL > ")
+                    self.send("\n\OTIS > ")
                     self.current_line += 1
                     self.current_col = 11
                     self.send_with_count(response, "OTIS")
